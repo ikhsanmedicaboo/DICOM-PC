@@ -18,6 +18,7 @@ class DicomListener extends EventEmitter {
     this.connections = new Map();
     this.watcherInterval = null;
     this.receivedInstances = new Map(); // Track SOP Instance UIDs to prevent same-session duplicates
+    this.processedFiles = new Set(); // Track files already processed by file watcher
   }
 
   async checkPortAvailability(port) {
@@ -357,23 +358,42 @@ class DicomListener extends EventEmitter {
 
       if (itemType === 0x20) {
         const pcId = itemData[0];
-        let transferSyntax = '1.2.840.10008.1.2.1';
+        const offeredTransferSyntaxes = [];
+        let abstractSyntax = '';
         let innerOffset = 4;
 
         while (innerOffset + 4 <= itemData.length) {
           const subType = itemData[innerOffset];
           const subLength = itemData.readUInt16BE(innerOffset + 2);
-          if (subType === 0x40 && subLength > 0) {
-            transferSyntax = itemData.slice(innerOffset + 4, innerOffset + 4 + subLength)
-              .toString('ascii')
-              .replace(/\0/g, '')
-              .trim();
-            break;
+          if (innerOffset + 4 + subLength > itemData.length) break;
+          if (subType === 0x30 && subLength > 0) {
+            // Abstract Syntax (SOP Class UID)
+            abstractSyntax = itemData.slice(innerOffset + 4, innerOffset + 4 + subLength)
+              .toString('ascii').replace(/\0/g, '').trim();
+          } else if (subType === 0x40 && subLength > 0) {
+            // Transfer Syntax
+            const ts = itemData.slice(innerOffset + 4, innerOffset + 4 + subLength)
+              .toString('ascii').replace(/\0/g, '').trim();
+            offeredTransferSyntaxes.push(ts);
           }
           innerOffset += 4 + subLength;
         }
 
-        acceptedPCs[pcId] = transferSyntax;
+        // Pick best supported Transfer Syntax (prefer Explicit VR LE > Implicit VR LE > first offered)
+        const preferredOrder = [
+          '1.2.840.10008.1.2.1',  // Explicit VR Little Endian
+          '1.2.840.10008.1.2',    // Implicit VR Little Endian
+        ];
+        let selectedTS = offeredTransferSyntaxes[0] || '1.2.840.10008.1.2.1';
+        for (const preferred of preferredOrder) {
+          if (offeredTransferSyntaxes.includes(preferred)) {
+            selectedTS = preferred;
+            break;
+          }
+        }
+
+        acceptedPCs[pcId] = selectedTS;
+        logger.debug(`PC ${pcId}: SOP=${abstractSyntax}, offered TS=[${offeredTransferSyntaxes.join(', ')}], accepted TS=${selectedTS}`);
       }
     }
 
@@ -484,30 +504,47 @@ class DicomListener extends EventEmitter {
       const element = data.readUInt16LE(offset + 2);
       const length = data.readUInt32LE(offset + 4);
 
-      if (group !== 0x0000) {
+      // Skip elements with undefined length or invalid length
+      if (length === 0xFFFFFFFF || offset + 8 + length > data.length) {
         break;
       }
 
       const value = data.slice(offset + 8, offset + 8 + length);
+      offset += 8 + length;
+
+      // Parse all group 0000 elements (command group), don't break on other groups
+      if (group !== 0x0000) {
+        continue;
+      }
+
       switch (element) {
         case 0x0002:
           command.affectedSOPClassUID = value.toString('ascii').replace(/\0/g, '').trim();
           break;
         case 0x0100:
-          command.commandField = value.readUInt16LE(0);
+          if (value.length >= 2) command.commandField = value.readUInt16LE(0);
           break;
         case 0x0110:
-          command.messageId = value.readUInt16LE(0);
+          if (value.length >= 2) command.messageId = value.readUInt16LE(0);
+          break;
+        case 0x0120:
+          if (value.length >= 2) command.messageIdBeingRespondedTo = value.readUInt16LE(0);
           break;
         case 0x0800:
-          command.dataSetType = value.readUInt16LE(0);
+          if (value.length >= 2) command.dataSetType = value.readUInt16LE(0);
           break;
         case 0x1000:
           command.affectedSOPInstanceUID = value.toString('ascii').replace(/\0/g, '').trim();
           break;
+        case 0x1030:
+          // MoveOriginatorApplicationEntityTitle - GE machines may send this
+          command.moveOriginatorAET = value.toString('ascii').replace(/\0/g, '').trim();
+          break;
+        case 0x1031:
+          // MoveOriginatorMessageID - GE machines may send this
+          if (value.length >= 2) command.moveOriginatorMessageId = value.readUInt16LE(0);
+          break;
       }
-
-      offset += 8 + length;
     }
 
     return command;
@@ -516,7 +553,7 @@ class DicomListener extends EventEmitter {
   dispatchDimseCommand(socket, state, presentationContextId, commandBuffer, connectionId) {
     const command = this.parseDimseCommand(commandBuffer);
     logger.info(
-      `DIMSE 0x${(command.commandField || 0).toString(16).padStart(4, '0')} on PC ${presentationContextId} from ${connectionId}`
+      `DIMSE cmd=0x${(command.commandField || 0).toString(16).padStart(4, '0')} msgId=${command.messageId || '?'} SOP=${command.affectedSOPClassUID || '?'} instanceUID=${command.affectedSOPInstanceUID || 'N/A'} dataSetType=0x${(command.dataSetType || 0).toString(16)} PC=${presentationContextId} from=${connectionId}`
     );
 
     switch (command.commandField) {
@@ -600,31 +637,35 @@ class DicomListener extends EventEmitter {
     );
 
     // Check for duplicate SOP Instance UID (prevents retry loops from GE machines)
-    const sopInstanceUID = pendingCommand.sopInstanceUID;
+    const sopInstanceUID = pendingCommand.sopInstanceUID || '';
     const now = Date.now();
-    
+
     // Clean up old entries (older than 5 minutes)
     for (const [uid, timestamp] of this.receivedInstances.entries()) {
       if (now - timestamp > 300000) {
         this.receivedInstances.delete(uid);
       }
     }
-    
-    if (this.receivedInstances.has(sopInstanceUID)) {
+
+    if (sopInstanceUID && this.receivedInstances.has(sopInstanceUID)) {
       const firstReceived = this.receivedInstances.get(sopInstanceUID);
       const ageSeconds = Math.floor((now - firstReceived) / 1000);
       logger.warn(`Skipping duplicate SOP Instance (received ${ageSeconds}s ago): ${sopInstanceUID}`);
       return; // Don't process duplicate, but already sent success to prevent retry
     }
-    
-    // Mark this instance as received
-    this.receivedInstances.set(sopInstanceUID, now);
 
-    try {
-      await this.saveAndProcessDicom(datasetBuffer, connectionId);
-    } catch (error) {
-      logger.error(`Error saving C-STORE dataset: ${error.message}`);
+    // Mark this instance as received
+    if (sopInstanceUID) {
+      this.receivedInstances.set(sopInstanceUID, now);
     }
+
+    // Process file asynchronously without blocking (fire-and-forget)
+    // This ensures the C-STORE-RSP is fully sent before heavy processing begins
+    setImmediate(() => {
+      this.saveAndProcessDicom(datasetBuffer, connectionId).catch(error => {
+        logger.error(`Error saving C-STORE dataset: ${error.message}`);
+      });
+    });
   }
 
   sendCStoreRSP(socket, presentationContextId, messageId, sopClassUID, sopInstanceUID) {
@@ -674,17 +715,52 @@ class DicomListener extends EventEmitter {
           }
 
           const filePath = path.resolve(path.join(config.dicom.storagePath, filename));
-          const stats = await fs.stat(filePath);
+
+          // Skip if we already processed this file path
+          if (this.processedFiles.has(filePath)) {
+            continue;
+          }
+
+          let stats;
+          try {
+            stats = await fs.stat(filePath);
+          } catch (err) {
+            // File may have been renamed/deleted between readdir and stat
+            continue;
+          }
+
           if (!stats.isFile()) {
             continue;
           }
 
+          // Wait for file to finish writing (size stable check)
           const first = stats.size;
-          await new Promise((resolve) => setTimeout(resolve, 400));
-          const second = (await fs.stat(filePath)).size;
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          let second;
+          try {
+            second = (await fs.stat(filePath)).size;
+          } catch (err) {
+            // File disappeared during wait
+            continue;
+          }
 
           if (first > 0 && first === second) {
-            await this.processReceivedFile(filePath);
+            // Mark as processed BEFORE processing to prevent race with next watcher tick
+            this.processedFiles.add(filePath);
+
+            try {
+              const normalizedPath = await this.ensureDcmExtension(filePath);
+              // Also track the renamed path
+              if (normalizedPath !== filePath) {
+                this.processedFiles.add(normalizedPath);
+              }
+              await this.processReceivedFile(normalizedPath);
+            } catch (err) {
+              logger.error(`Error processing watched file ${filename}: ${err.message}`);
+              // Remove from processed set so it can be retried next cycle
+              this.processedFiles.delete(filePath);
+            }
           }
         }
       } catch (error) {
@@ -706,9 +782,30 @@ class DicomListener extends EventEmitter {
   async processReceivedFile(filePath) {
     const normalizedPath = await this.ensureDcmExtension(filePath);
     const filename = path.basename(normalizedPath);
-    
+
     const fileBuffer = await fs.readFile(normalizedPath);
     const dataSet = dicomParser.parseDicom(fileBuffer);
+
+    const sopInstanceUID = this.getStringValue(dataSet, 'x00080018');
+
+    // Deduplicate by SOP Instance UID (prevents storescp retry from creating duplicate transfers)
+    if (sopInstanceUID) {
+      const now = Date.now();
+      // Clean up old entries (older than 10 minutes)
+      for (const [uid, timestamp] of this.receivedInstances.entries()) {
+        if (now - timestamp > 600000) {
+          this.receivedInstances.delete(uid);
+        }
+      }
+      if (this.receivedInstances.has(sopInstanceUID)) {
+        const ageSeconds = Math.floor((now - this.receivedInstances.get(sopInstanceUID)) / 1000);
+        logger.warn(`Skipping duplicate SOP Instance UID ${sopInstanceUID} (first seen ${ageSeconds}s ago): ${filename}`);
+        // Remove the duplicate file to keep folder clean
+        try { await fs.remove(normalizedPath); } catch (e) { /* ignore */ }
+        return;
+      }
+      this.receivedInstances.set(sopInstanceUID, now);
+    }
 
     const metadata = {
       patientId: this.getStringValue(dataSet, 'x00100020') || 'UNKNOWN',
@@ -721,13 +818,12 @@ class DicomListener extends EventEmitter {
       status: 'pending'
     };
 
-    // Allow re-processing same Study Instance UID across repeated sends.
-
     const transferId = TransferModel.create(metadata);
 
     logger.info(`DICOM received, queued transfer ${transferId}`, {
       patientId: metadata.patientId,
       modality: metadata.modality,
+      sopInstanceUID: sopInstanceUID || 'unknown',
       filePath: normalizedPath
     });
 
@@ -802,6 +898,7 @@ class DicomListener extends EventEmitter {
 
     // Clear duplicate detection cache
     this.receivedInstances.clear();
+    this.processedFiles.clear();
 
     this.isRunning = false;
     this.emit('stopped');
