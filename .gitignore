@@ -1,0 +1,29 @@
+node_modules/
+storage/dicom/*
+storage/logs/*
+!storage/dicom/.gitkeep
+!storage/logs/.gitkeep
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+.env
+.env.bak
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build output
+dist/
+*.exe
+*.zip
+
+# Runtime storage
+storage/auth.json
+storage/lite-store.json

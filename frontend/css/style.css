@@ -1,0 +1,413 @@
+:root {
+    --primary-color: #0d6efd;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+    --secondary-color: #6c757d;
+}
+
+body {
+    background-color: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#connectionStatus {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.card-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#dicomStatus i,
+#apiStatus i {
+    font-size: 1.5rem;
+}
+
+.status-running {
+    color: var(--success-color) !important;
+}
+
+.status-stopped {
+    color: var(--danger-color) !important;
+}
+
+.status-error {
+    color: var(--warning-color) !important;
+}
+
+.status-unknown {
+    color: var(--secondary-color) !important;
+}
+
+.table-responsive {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.table thead th {
+    position: sticky;
+    top: 0;
+    background-color: #fff;
+    z-index: 10;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.table-sm td,
+.table-sm th {
+    padding: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.badge-status {
+    min-width: 70px;
+    padding: 0.35rem 0.65rem;
+}
+
+.badge-pending {
+    background-color: var(--warning-color);
+    color: #000;
+}
+
+.badge-sent {
+    background-color: var(--success-color);
+}
+
+.badge-failed {
+    background-color: var(--danger-color);
+}
+
+.event-log {
+    max-height: 500px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 1rem;
+}
+
+.event-item {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background-color: #fff;
+    border-left: 4px solid #dee2e6;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.event-item:hover {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.event-item.event-info {
+    border-left-color: var(--info-color);
+}
+
+.event-item.event-warn {
+    border-left-color: var(--warning-color);
+    background-color: #fff9e6;
+}
+
+.event-item.event-error {
+    border-left-color: var(--danger-color);
+    background-color: #ffe6e6;
+}
+
+.event-timestamp {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.event-message {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.875rem;
+}
+
+.validation-result {
+    padding: 1rem;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+}
+
+.validation-success {
+    background-color: #d1e7dd;
+    border: 1px solid #badbcc;
+    color: #0f5132;
+}
+
+.validation-error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c2c7;
+    color: #842029;
+}
+
+.toast {
+    min-width: 300px;
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+.status-cards > [class*="col-"] {
+    display: flex;
+}
+
+.status-card {
+    width: 100%;
+}
+
+.status-card .card-body {
+    min-height: 150px;
+}
+
+/* Loading animation */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.15em;
+}
+
+/* Pulse animation for status indicators */
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+/* Login Screen Styling */
+.login-container {
+    min-height: calc(100vh - 60px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 2rem;
+}
+
+.login-box {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    max-width: 450px;
+    width: 100%;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.login-box h3 {
+    color: #333;
+    font-weight: 600;
+}
+
+.login-box .form-label {
+    font-weight: 600;
+    color: #555;
+}
+
+.login-box .form-control {
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+.login-box .form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+.login-box .btn-primary {
+    padding: 0.75rem;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.login-box .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Transfer row hover effect */
+.transfer-row {
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.transfer-row:hover {
+    background-color: #f0f7ff !important;
+    transform: scale(1.005);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.transfer-row:active {
+    transform: scale(0.998);
+}
+
+/* Modal customization */
+.modal-lg {
+    max-width: 900px;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, var(--primary-color), #0b5ed7);
+    color: white;
+}
+
+.modal-header .btn-close {
+    filter: brightness(0) invert(1);
+}
+
+.text-monospace {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.85rem;
+}
+
+/* Details summary styling */
+details summary {
+    user-select: none;
+}
+
+details summary:hover {
+    color: var(--primary-color);
+}
+
+details[open] summary {
+    margin-bottom: 0.5rem;
+}
+
+/* File size column */
+.file-size {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.85rem;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.75rem;
+    }
+    
+    .btn-sm {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+}
+
+/* Tab content styling */
+.tab-content {
+    min-height: 400px;
+}
+
+.nav-tabs .nav-link {
+    color: #495057;
+    border: none;
+    border-bottom: 3px solid transparent;
+}
+
+.nav-tabs .nav-link:hover {
+    border-bottom-color: #dee2e6;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background-color: transparent;
+}
+
+/* Button groups */
+.btn-group-sm .btn {
+    font-size: 0.75rem;
+}
+
+/* File size formatting */
+.file-size {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+}
+
+/* Connection status badge */
+.connection-badge {
+    animation: pulse 2s infinite;
+}
+
+.connection-badge.connected {
+    animation: none;
+}

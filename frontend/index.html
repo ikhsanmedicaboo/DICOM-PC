@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Router - Powered by Assist.id</title>
+    <meta name="description" content="DICOM Router for SatuSehat Integration - Developed by Assist.id, Indonesia's Leading Healthcare Technology Company">
+    <meta name="author" content="Assist.id - PT. Jaga Anugrah Giat Asa">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-diagram-3"></i> DICOM Router
+                <small class="text-white-50" style="font-size: 0.7rem;">powered by</small>
+                <strong style="color: #00D9FF;">Assist.id</strong>
+            </span>
+            <div class="d-flex align-items-center">
+                <span class="badge bg-light text-dark me-3" id="serverTime">--:--:--</span>
+                <span class="badge" id="connectionStatus">
+                    <i class="bi bi-circle-fill text-secondary"></i> Connecting...
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-box">
+            <div class="text-center mb-4">
+                <i class="bi bi-shield-lock" style="font-size: 3rem; color: #0d6efd;"></i>
+                <h3 class="mt-3">DICOM Router Login</h3>
+                <p class="text-muted">Enter your hospital credentials</p>
+            </div>
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label for="hospitalId" class="form-label">
+                        <i class="bi bi-hospital"></i> Hospital ID
+                    </label>
+                    <input type="text" class="form-control" id="hospitalId" 
+                           placeholder="Enter Hospital ID" required>
+                    <small class="text-muted">Your unique hospital identifier</small>
+                </div>
+                <div class="mb-3">
+                    <label for="apiKey" class="form-label">
+                        <i class="bi bi-key"></i> API Key
+                    </label>
+                    <input type="password" class="form-control" id="apiKey" 
+                           placeholder="Enter API Key" required>
+                    <small class="text-muted">Your API authentication key</small>
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" id="rememberMe">
+                    <label class="form-check-label" for="rememberMe">
+                        Remember my credentials
+                    </label>
+                </div>
+                <div id="loginError" class="alert alert-danger d-none" role="alert">
+                    <i class="bi bi-exclamation-triangle"></i> <span id="loginErrorMsg"></span>
+                </div>
+                <button type="submit" class="btn btn-primary w-100" id="btnLogin">
+                    <i class="bi bi-box-arrow-in-right"></i> Login
+                </button>
+            </form>
+            <hr class="my-4">
+            <div class="text-center">
+                <p class="small text-muted mb-1">
+                    <i class="bi bi-info-circle"></i> Need credentials?
+                </p>
+                <p class="small">
+                    Contact <strong style="color: #00D9FF;">Assist.id</strong> Support<br>
+                    <i class="bi bi-telephone"></i> 082112222500 | 
+                    <i class="bi bi-envelope"></i> info@assist.id
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid mt-4" id="dashboardContent" style="display: none;">
+        <!-- Status Cards Row -->
+        <div class="row mb-4 status-cards">
+            <!-- API Status -->
+            <div class="col-md-3">
+                <div class="card status-card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted">API Connection</h6>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h3 id="apiStatus" class="mb-0">
+                                    <i class="bi bi-circle-fill text-secondary"></i>
+                                </h3>
+                                <small id="apiAuth" class="text-muted">Auth: --</small>
+                                <br>
+                                <small id="hospitalInfo" class="text-muted">Hospital: --</small>
+                            </div>
+                            <div class="text-end">
+                                <button class="btn btn-sm btn-outline-primary" id="btnTestApi">
+                                    <i class="bi bi-arrow-repeat"></i> Test
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Files Received -->
+            <div class="col-md-3">
+                <div class="card status-card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted">Files (24h)</h6>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div id="statsTotal" class="fs-4 fw-bold">0</div>
+                                <small class="text-muted">Total Received</small>
+                            </div>
+                            <div class="text-end">
+                                <div id="statsSent" class="text-success fw-bold">0</div>
+                                <small class="text-muted">Sent</small>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <div class="progress" style="height: 8px;">
+                                <div id="statsProgress" class="progress-bar bg-success" role="progressbar" 
+                                     style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <small id="statsRate" class="text-muted">Success: 0%</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Transfers -->
+            <div class="col-md-3">
+                <div class="card status-card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted">Queue Status</h6>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div id="statsPending" class="fs-4 fw-bold text-warning">0</div>
+                                <small class="text-muted">Pending</small>
+                            </div>
+                            <div class="text-end">
+                                <div id="statsFailed" class="fs-5 fw-bold text-danger">0</div>
+                                <small class="text-muted">Failed</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DICOM Listener -->
+            <div class="col-md-3">
+                <div class="card status-card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted">DICOM Listener</h6>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h3 id="dicomStatus" class="mb-0">
+                                    <i class="bi bi-circle-fill text-secondary"></i>
+                                </h3>
+                                <small id="dicomInfo" class="text-muted">Port: --</small>
+                            </div>
+                            <div class="text-end">
+                                <button class="btn btn-sm btn-outline-primary" id="btnToggleDicom">
+                                    <i class="bi bi-power"></i> Start
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Tabs -->
+        <div class="row">
+            <div class="col-12">
+                <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="transfers-tab" data-bs-toggle="tab" 
+                                data-bs-target="#transfers" type="button">
+                            <i class="bi bi-file-earmark-medical"></i> Transfer Logs
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="upload-tab" data-bs-toggle="tab" 
+                                data-bs-target="#upload" type="button">
+                            <i class="bi bi-cloud-upload"></i> Upload File
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="events-tab" data-bs-toggle="tab" 
+                                data-bs-target="#events" type="button">
+                            <i class="bi bi-activity"></i> System Events
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="validation-tab" data-bs-toggle="tab" 
+                                data-bs-target="#validation" type="button">
+                            <i class="bi bi-shield-check"></i> Validation
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content border border-top-0 p-3 bg-white" id="mainTabContent">
+                    <!-- Transfer Logs Tab -->
+                    <div class="tab-pane fade show active" id="transfers" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5>Recent Transfers</h5>
+                            <button class="btn btn-sm btn-primary" id="btnRefreshTransfers">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Patient ID</th>
+                                        <th>Patient Name</th>
+                                        <th>Study Date</th>
+                                        <th>Modality</th>
+                                        <th>Size</th>
+                                        <th>Status</th>
+                                        <th>Retries</th>
+                                        <th>Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transfersTableBody">
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted">
+                                            Loading transfers...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Upload File Tab -->
+                    <div class="tab-pane fade" id="upload" role="tabpanel">
+                        <h5 class="mb-4">Upload DICOM File</h5>
+                        
+                        <div class="card">
+                            <div class="card-body">
+                                <form id="uploadForm">
+                                    <div class="mb-3">
+                                        <label for="dicomFile" class="form-label">
+                                            <i class="bi bi-file-earmark-medical"></i> Select DICOM File (.dcm)
+                                        </label>
+                                        <input type="file" class="form-control" id="dicomFile" 
+                                               accept=".dcm,.dicom" required>
+                                        <div class="form-text">
+                                            Maximum file size: 100 MB. Supported formats: .dcm, .dicom
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="fileInfo" class="mb-3 d-none">
+                                        <div class="alert alert-info">
+                                            <strong>Selected File:</strong>
+                                            <div id="fileName" class="mt-2"></div>
+                                            <div id="fileSize" class="mt-1 text-muted"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="uploadProgress" class="mb-3 d-none">
+                                        <div class="progress">
+                                            <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                 role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                        <div id="uploadStatus" class="text-center mt-2 text-muted"></div>
+                                    </div>
+                                    
+                                    <div id="uploadResult" class="mb-3"></div>
+                                    
+                                    <button type="submit" class="btn btn-primary" id="btnUpload">
+                                        <i class="bi bi-cloud-upload"></i> Upload to API
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="btnClearUpload">
+                                        <i class="bi bi-x-circle"></i> Clear
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Events Tab -->
+                    <div class="tab-pane fade" id="events" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5>System Events</h5>
+                            <button class="btn btn-sm btn-primary" id="btnRefreshEvents">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="event-log" id="eventLog">
+                            <div class="text-center text-muted">
+                                Loading events...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Validation Tab -->
+                    <div class="tab-pane fade" id="validation" role="tabpanel">
+                        <h5 class="mb-4">Connection Validation</h5>
+                        
+                        <div class="row">
+                            <!-- API Validation -->
+                            <div class="col-md-6 mb-4">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">API Connection Test</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <button class="btn btn-primary btn-sm mb-3" id="btnValidateApi">
+                                            <i class="bi bi-check-circle"></i> Test API Connection
+                                        </button>
+                                        <div id="apiValidationResult"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Auth Validation -->
+                            <div class="col-md-6 mb-4">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">Authentication Test</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <button class="btn btn-primary btn-sm mb-3" id="btnValidateAuth">
+                                            <i class="bi bi-check-circle"></i> Test Authentication
+                                        </button>
+                                        <div id="authValidationResult"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- End Dashboard Content -->
+
+    <!-- Transfer Details Modal -->
+    <div class="modal fade" id="transferDetailsModal" tabindex="-1" aria-labelledby="transferDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="transferDetailsModalLabel">Transfer Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="transferDetailsBody">
+                    <div class="text-center py-5">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white mt-5 py-4">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5 class="text-info">Assist.id</h5>
+                    <p class="small mb-2">Sistem RME & Manajemen Klinik #1 di Indonesia</p>
+                    <p class="small text-muted mb-0">
+                        <i class="bi bi-building"></i> PT. Jaga Anugrah Giat Asa<br>
+                        <i class="bi bi-check-circle-fill text-success"></i> 6,000+ Fasilitas Kesehatan<br>
+                        <i class="bi bi-shield-check-fill text-success"></i> ISO 27001 Certified<br>
+                        <i class="bi bi-award-fill text-success"></i> PSE Kemkomdigi Registered
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-info">Contact</h6>
+                    <p class="small text-muted mb-0">
+                        <i class="bi bi-telephone-fill"></i> 082112222500<br>
+                        <i class="bi bi-envelope-fill"></i> info@assist.id<br>
+                        <i class="bi bi-globe"></i> <a href="https://assist.id" target="_blank" class="text-white">www.assist.id</a>
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-info">About This Application</h6>
+                    <p class="small text-muted mb-0">
+                        DICOM Router for SatuSehat Integration<br>
+                        Enabling seamless medical imaging data flow<br>
+                        <span class="badge bg-success mt-2">Developed by Assist.id</span>
+                    </p>
+                </div>
+            </div>
+            <hr class="border-secondary my-3">
+            <div class="text-center small text-muted">
+                <p class="mb-0">&copy; 2026 Assist.id - PT. Jaga Anugrah Giat Asa. All Rights Reserved.</p>
+                <p class="mb-0">Trusted by Healthcare Facilities across Indonesia</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/socket-handler.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

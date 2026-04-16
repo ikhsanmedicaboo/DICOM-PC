@@ -1,0 +1,70 @@
+{
+  "name": "assist-dicom-router",
+  "version": "1.0.0",
+  "description": "DICOM Router for Fuji FCR to SatuSehat API Integration (Windows 7 Compatible)",
+  "main": "index.js",
+  "bin": "index.js",
+  "engines": {
+    "node": ">=12.22.0",
+    "npm": ">=6.14.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "init-db": "node backend/database/init.js",
+    "test-dicom": "node tests/test-dicom-connection.js",
+    "test-api": "node tests/test-api-connection.js",
+    "simulate-send": "node tests/simulate-dicom-send.js",
+    "build": "pkg . --targets node12-win-x64 --output dist/DICOM-Router.exe",
+    "build:win7": "pkg . --targets node12-win-x64 --output dist/DICOM-Router-Win7.exe",
+    "build:full": "node build.js"
+  },
+  "keywords": [
+    "dicom",
+    "router",
+    "satusehat",
+    "fuji-fcr",
+    "medical-imaging",
+    "assist.id"
+  ],
+  "author": "Assist.id (PT. Jaga Anugrah Giat Asa) - https://assist.id",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.27.2",
+    "better-sqlite3": "^7.6.2",
+    "body-parser": "^1.20.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dcmjs": "^0.29.0",
+    "dicom-parser": "^1.8.13",
+    "dotenv": "^10.0.0",
+    "express": "^4.17.3",
+    "form-data": "^4.0.0",
+    "fs-extra": "^10.1.0",
+    "helmet": "^4.6.0",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.5.4",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20",
+    "pkg": "^5.8.0"
+  },
+  "pkg": {
+    "scripts": [
+      "backend/**/*.js",
+      "node_modules/socket.io/**/*.js"
+    ],
+    "assets": [
+      "frontend/**/*",
+      "storage/**/*",
+      "node_modules/better-sqlite3/**/*.node",
+      "node_modules/dcmjs/**/*",
+      "node_modules/dicom-parser/**/*"
+    ],
+    "targets": [
+      "node12-win-x64"
+    ],
+    "outputPath": "dist"
+  }
+}
