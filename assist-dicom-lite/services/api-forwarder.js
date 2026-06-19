@@ -87,7 +87,9 @@ class ApiForwarder extends EventEmitter {
 
     try {
       if (!await fs.pathExists(transfer.file_path)) {
-        throw new Error('DICOM file not found');
+        logger.warn(`Transfer ${transfer.id} failed because file was missing: ${transfer.file_path}`);
+        TransferModel.updateStatus(transfer.id, 'failed', 'DICOM file not found');
+        return;
       }
 
       const token = await this.getAuthToken();

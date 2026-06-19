@@ -785,6 +785,14 @@ class DicomListener extends EventEmitter {
 
     const fileBuffer = await fs.readFile(normalizedPath);
     const dataSet = dicomParser.parseDicom(fileBuffer);
+    const sopInstanceUid = this.getStringValue(dataSet, 'x00080018') || this.generateUid();
+    const studyInstanceUid = this.getStringValue(dataSet, 'x0020000d') || this.generateUid();
+
+    const existingTransfer = TransferModel.getBySopInstanceUid(sopInstanceUid);
+    if (existingTransfer && (existingTransfer.status === 'pending' || existingTransfer.status === 'sent')) {
+      logger.warn(`Duplicate SOP Instance skipped: ${sopInstanceUid} (transfer ${existingTransfer.id}, status=${existingTransfer.status})`);
+      return;
+    }
 
     const sopInstanceUID = this.getStringValue(dataSet, 'x00080018');
 
@@ -812,7 +820,8 @@ class DicomListener extends EventEmitter {
       patientName: this.getStringValue(dataSet, 'x00100010') || 'UNKNOWN',
       studyDate: this.getStringValue(dataSet, 'x00080020') || '',
       modality: this.getStringValue(dataSet, 'x00080060') || 'OT',
-      studyInstanceUid: this.getStringValue(dataSet, 'x0020000d') || this.generateUid(),
+      studyInstanceUid,
+      sopInstanceUid,
       filePath: normalizedPath,
       fileSize: fileBuffer.length,
       status: 'pending'

@@ -13,6 +13,7 @@ const TransferModel = {
       study_date: data.studyDate || '',
       modality: data.modality || 'OT',
       study_instance_uid: data.studyInstanceUid || '',
+      sop_instance_uid: data.sopInstanceUid || '',
       file_path: data.filePath,
       file_size: data.fileSize || 0,
       status: data.status || 'pending',
@@ -32,6 +33,12 @@ const TransferModel = {
     if (!uid) return null;
     const store = readStore();
     return store.transfers.find((item) => item.study_instance_uid === uid) || null;
+  },
+
+  getBySopInstanceUid(uid) {
+    if (!uid) return null;
+    const store = readStore();
+    return store.transfers.find((item) => item.sop_instance_uid === uid) || null;
   },
 
   getPending(limit) {
