@@ -660,11 +660,18 @@ class DicomListener extends EventEmitter {
       this.receivedInstances.set(sopInstanceUID, now);
     }
 
+    const transferSyntaxUID = state.presentationContexts[presentationContextId] || '1.2.840.10008.1.2.1';
+
     // Process file asynchronously without blocking (fire-and-forget)
     // This ensures the C-STORE-RSP is fully sent before heavy processing begins
     setImmediate(() => {
-      this.saveAndProcessDicom(datasetBuffer, connectionId).catch(error => {
-        logger.error(`Error saving C-STORE dataset: ${error.message}`);
+      this.saveAndProcessDicom(datasetBuffer, connectionId, {
+        sopClassUID: pendingCommand.sopClassUID,
+        sopInstanceUID: pendingCommand.sopInstanceUID,
+        transferSyntaxUID
+      }).catch(error => {
+        const errorMsg = error instanceof Error ? error.message : (error ? String(error) : 'Unknown error');
+        logger.error(`Error saving C-STORE dataset: ${errorMsg}`);
       });
     });
   }
@@ -770,12 +777,81 @@ class DicomListener extends EventEmitter {
     }, 2000);
   }
 
-  async saveAndProcessDicom(buffer, source) {
+  buildDicomPart10Header(sopClassUID, sopInstanceUID, transferSyntaxUID) {
+    const preamble = Buffer.alloc(128, 0);
+    const prefix = Buffer.from('DICM', 'ascii');
+
+    const encUID = (uid) => {
+      const buf = Buffer.from(uid || '', 'ascii');
+      return buf.length % 2 !== 0 ? Buffer.concat([buf, Buffer.from([0x00])]) : buf;
+    };
+
+    const encSH = (str) => {
+      const buf = Buffer.from(str || '', 'ascii');
+      return buf.length % 2 !== 0 ? Buffer.concat([buf, Buffer.from([0x20])]) : buf;
+    };
+
+    const makeExplicitEl = (elementId, vr, valueBuffer) => {
+      const header = Buffer.alloc(8);
+      header.writeUInt16LE(0x0002, 0);
+      header.writeUInt16LE(elementId, 2);
+      header.write(vr, 4, 2, 'ascii');
+
+      if (['OB', 'OW', 'OF', 'UT', 'SQ', 'UN'].includes(vr)) {
+        const extendedHeader = Buffer.alloc(12);
+        extendedHeader.writeUInt16LE(0x0002, 0);
+        extendedHeader.writeUInt16LE(elementId, 2);
+        extendedHeader.write(vr, 4, 2, 'ascii');
+        extendedHeader.writeUInt16BE(0, 6);
+        extendedHeader.writeUInt32LE(valueBuffer.length, 8);
+        return Buffer.concat([extendedHeader, valueBuffer]);
+      } else {
+        header.writeUInt16LE(valueBuffer.length, 6);
+        return Buffer.concat([header, valueBuffer]);
+      }
+    };
+
+    const elements = [];
+    // File Meta Information Version
+    elements.push(makeExplicitEl(0x0001, 'OB', Buffer.from([0x00, 0x01])));
+    // Media Storage SOP Class UID
+    elements.push(makeExplicitEl(0x0002, 'UI', encUID(sopClassUID)));
+    // Media Storage SOP Instance UID
+    elements.push(makeExplicitEl(0x0003, 'UI', encUID(sopInstanceUID)));
+    // Transfer Syntax UID
+    elements.push(makeExplicitEl(0x0010, 'UI', encUID(transferSyntaxUID)));
+    // Implementation Class UID
+    elements.push(makeExplicitEl(0x0012, 'UI', encUID('1.2.276.0.7230010.3.0.3.6.4')));
+    // Implementation Version Name
+    elements.push(makeExplicitEl(0x0013, 'SH', encSH('ASSIST_ROUTER')));
+
+    const metaBytesWithoutLength = Buffer.concat(elements);
+
+    // File Meta Information Group Length
+    const lengthBuf = Buffer.alloc(4);
+    lengthBuf.writeUInt32LE(metaBytesWithoutLength.length, 0);
+    const groupLengthEl = makeExplicitEl(0x0000, 'UL', lengthBuf);
+
+    const metaHeader = Buffer.concat([groupLengthEl, metaBytesWithoutLength]);
+    return Buffer.concat([preamble, prefix, metaHeader]);
+  }
+
+  async saveAndProcessDicom(buffer, source, metadata = {}) {
     const filename = `dcm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.dcm`;
     const filePath = path.resolve(path.join(config.dicom.storagePath, filename));
 
-    await fs.writeFile(filePath, buffer);
-    logger.info(`DICOM file saved: ${filename} (${buffer.length} bytes) from ${source || 'socket'}`);
+    let finalBuffer = buffer;
+    if (metadata.sopClassUID && metadata.sopInstanceUID) {
+      const header = this.buildDicomPart10Header(
+        metadata.sopClassUID,
+        metadata.sopInstanceUID,
+        metadata.transferSyntaxUID || '1.2.840.10008.1.2.1'
+      );
+      finalBuffer = Buffer.concat([header, buffer]);
+    }
+
+    await fs.writeFile(filePath, finalBuffer);
+    logger.info(`DICOM file saved: ${filename} (${finalBuffer.length} bytes) from ${source || 'socket'}`);
     
     await this.processReceivedFile(filePath);
   }
