@@ -464,8 +464,9 @@ class DicomListener extends EventEmitter {
 
       const presentationContextId = data[offset + 4];
       const messageControlHeader = data[offset + 5];
-      const isCommand = (messageControlHeader & 0x02) !== 0;
-      const isLast = (messageControlHeader & 0x01) !== 0;
+      // Per DICOM PS3.8 9.3.5.1: bit 0 (0x01) = Command(1)/Data(0), bit 1 (0x02) = Last fragment
+      const isCommand = (messageControlHeader & 0x01) !== 0;
+      const isLast = (messageControlHeader & 0x02) !== 0;
       const payload = data.slice(offset + 6, offset + 4 + pdvLength);
       offset += 4 + pdvLength;
 
