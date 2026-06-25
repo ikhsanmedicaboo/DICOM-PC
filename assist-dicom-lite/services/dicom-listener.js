@@ -637,7 +637,8 @@ class DicomListener extends EventEmitter {
       pendingCommand.sopInstanceUID
     );
 
-    // Check for duplicate SOP Instance UID (prevents retry loops from GE machines)
+    // Check for duplicate SOP Instance UID (prevents retry loops from GE machines) - Disabled for now
+    /*
     const sopInstanceUID = pendingCommand.sopInstanceUID || '';
     const now = Date.now();
 
@@ -659,6 +660,7 @@ class DicomListener extends EventEmitter {
     if (sopInstanceUID) {
       this.receivedInstances.set(sopInstanceUID, now);
     }
+    */
 
     const transferSyntaxUID = state.presentationContexts[presentationContextId] || '1.2.840.10008.1.2.1';
 
@@ -865,32 +867,34 @@ class DicomListener extends EventEmitter {
     const sopInstanceUid = this.getStringValue(dataSet, 'x00080018') || this.generateUid();
     const studyInstanceUid = this.getStringValue(dataSet, 'x0020000d') || this.generateUid();
 
+    /*
     const existingTransfer = TransferModel.getBySopInstanceUid(sopInstanceUid);
     if (existingTransfer && (existingTransfer.status === 'pending' || existingTransfer.status === 'sent')) {
       logger.warn(`Duplicate SOP Instance skipped: ${sopInstanceUid} (transfer ${existingTransfer.id}, status=${existingTransfer.status})`);
       return;
     }
+    */
 
     const sopInstanceUID = this.getStringValue(dataSet, 'x00080018');
 
-    // Deduplicate by SOP Instance UID (prevents storescp retry from creating duplicate transfers)
-    if (sopInstanceUID) {
-      const now = Date.now();
-      // Clean up old entries (older than 10 minutes)
-      for (const [uid, timestamp] of this.receivedInstances.entries()) {
-        if (now - timestamp > 600000) {
-          this.receivedInstances.delete(uid);
-        }
-      }
-      if (this.receivedInstances.has(sopInstanceUID)) {
-        const ageSeconds = Math.floor((now - this.receivedInstances.get(sopInstanceUID)) / 1000);
-        logger.warn(`Skipping duplicate SOP Instance UID ${sopInstanceUID} (first seen ${ageSeconds}s ago): ${filename}`);
-        // Remove the duplicate file to keep folder clean
-        try { await fs.remove(normalizedPath); } catch (e) { /* ignore */ }
-        return;
-      }
-      this.receivedInstances.set(sopInstanceUID, now);
-    }
+    // Deduplicate by SOP Instance UID (prevents storescp retry from creating duplicate transfers) - Disabled for now
+    // if (sopInstanceUID) {
+    //   const now = Date.now();
+    //   // Clean up old entries (older than 10 minutes)
+    //   for (const [uid, timestamp] of this.receivedInstances.entries()) {
+    //     if (now - timestamp > 600000) {
+    //       this.receivedInstances.delete(uid);
+    //     }
+    //   }
+    //   if (this.receivedInstances.has(sopInstanceUID)) {
+    //     const ageSeconds = Math.floor((now - this.receivedInstances.get(sopInstanceUID)) / 1000);
+    //     logger.warn(`Skipping duplicate SOP Instance UID ${sopInstanceUID} (first seen ${ageSeconds}s ago): ${filename}`);
+    //     // Remove the duplicate file to keep folder clean
+    //     try { await fs.remove(normalizedPath); } catch (e) { /* ignore */ }
+    //     return;
+    //   }
+    //   this.receivedInstances.set(sopInstanceUID, now);
+    // }
 
     const metadata = {
       patientId: this.getStringValue(dataSet, 'x00100020') || 'UNKNOWN',
